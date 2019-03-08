@@ -1,7 +1,7 @@
 # dcgan-tensorflow
 
 In this tutorial, we generate face images using DCGAN.
-![alt text](https://github.com/fabulousjeong/dcgan-tensorflow/blob/master/dcgan_celeb.gif)
+![alt text](https://github.com/fabulousjeong/dcgan-tensorflow/blob/master/images/dcgan_celeb.gif?raw=true)
 
 
 See below article for details.

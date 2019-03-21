@@ -121,7 +121,7 @@ class DCGAN(object):
                                                                 var_list=g_var_list)
         return d_opt, g_opt
 
-    def sample(self, Z):
-        g_out = self.generator(Z, reuse = True)
+    def sample(self, Z, reuse = True):
+        g_out = self.generator(Z, reuse = reuse)
         return g_out
 

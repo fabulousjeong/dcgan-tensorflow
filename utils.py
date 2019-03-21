@@ -22,4 +22,5 @@ def save_samples(title, samples):
             axes[i][j].imshow(samples_grid[i][j])
 
     plt.savefig(title, bbox_inches='tight')
+    print('saved %s.' % title)
     plt.close(fig)

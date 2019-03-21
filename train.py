@@ -25,8 +25,8 @@ def train(data_root, model, total_epoch, batch_size, lrate):
 
     total_batch = int(image_count/batch_size)
     #learning_rate = lrate
-
-
+    #G_var_list = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='generator')
+    saver = tf.train.Saver()
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         sess.run(iterator.initializer)
@@ -54,6 +54,8 @@ def train(data_root, model, total_epoch, batch_size, lrate):
                     '%05d/%05d' % (step, total_batch),
                     'D loss: {:.4}'.format(loss_val_D),
                     'G loss: {:.4}'.format(loss_val_G))
+            saver.save(sess, './models/dcgan', global_step=epoch)
+
 
 
 
@@ -64,7 +66,7 @@ if __name__ == "__main__":
     batch_size = 32
     n_noise = 100
     image_size = 64
-    image_channels = 1
+    image_channels = 3
     learning_rate = 0.0002
     total_epochs = 20
 

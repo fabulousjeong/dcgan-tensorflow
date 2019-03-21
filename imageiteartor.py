@@ -27,12 +27,12 @@ class ImageIterator(object):
 
     def load_and_preprocess_image(self, path):
         image = tf.read_file(path)
-        return self.preprocess_image(image, isCrop = False)
+        return self.preprocess_image(image, isCrop = True)
 
     def get_iterator(self):
         AUTOTUNE = tf.contrib.data.AUTOTUNE
 
-        all_image_paths = list(self.data_root.glob('*/*'))#for mnist(has sub-directories) uses */* 
+        all_image_paths = list(self.data_root.glob('*'))#for mnist(has sub-directories) uses */* 
         all_image_paths = [str(path) for path in all_image_paths]
         random.shuffle(all_image_paths)
         image_count = len(all_image_paths)

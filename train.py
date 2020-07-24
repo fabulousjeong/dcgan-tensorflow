@@ -1,60 +1,99 @@
 import tensorflow as tf
-
-import os
-from simplegan import SIMPLEGAN
+tf.config.experimental_run_functions_eagerly(True)
 from dcgan import DCGAN
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+import time
 
+import glob
+import imageio
 import math
 
-import utils
-from imageiteartor import ImageIterator
+def train(train_dir, model, total_epoch, batch_size, lrate):
+
+    # Set the image generator. we can use "ImageDataGenerator" in the keras API 
+    train_image_generator = ImageDataGenerator(rescale=1./255, horizontal_flip=True)
+    train_data_gen = train_image_generator.flow_from_directory(batch_size=batch_size,
+                                                            directory=train_dir,
+                                                            shuffle=True,
+                                                            target_size=(64, 64))
+    print('num:', len(train_data_gen))
+
+    # Define the models
+    generator = model.generator()
+    discriminator = model.discriminator()
+
+    # Define optimizer
+    discriminator_optimizer, generator_optimizer = model.optimizer(lrate)
+
+    # Set the ckpt to save trained weights 
+    checkpoint_dir = './training_checkpoints'
+    checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
+    checkpoint = tf.train.Checkpoint(generator_optimizer=generator_optimizer,
+                                    discriminator_optimizer=discriminator_optimizer,
+                                    generator=generator,
+                                    discriminator=discriminator)
+
+    #checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
 
 
-def train(data_root, model, total_epoch, batch_size, lrate):
+    # Set some hyper parameters 
+    noise_dim = 100
+    epoch_drop = 20
 
-    X, Z, Lr = model.inputs()
-    d_loss, g_loss = model.loss(X, Z)
-    d_opt, g_opt = model.optimizer(d_loss, g_loss, Lr)
-    g_sample = model.sample(Z)
-    sample_size = batch_size
-    test_noise = utils.get_noise(sample_size, n_noise)
-    epoch_drop = 3
+    # We will reuse this seed overtime (so it's easier)
+    # to visualize progress in the animated GIF)
+    num_examples_to_generate = 16
+    seed = tf.random.normal([num_examples_to_generate, noise_dim])
 
-    iterator, image_count = ImageIterator(data_root, batch_size, model.image_size, model.image_channels).get_iterator()
-    next_element = iterator.get_next()
+    # Notice the use of `tf.function`
+    # This annotation causes the function to be "compiled".
+    @tf.function
+    def train_step(images, discriminator_optimizer, generator_optimizer ):
+        noise = tf.random.normal([batch_size, noise_dim])
 
-    total_batch = int(image_count/batch_size)
-    #learning_rate = lrate
-    #G_var_list = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='generator')
-    saver = tf.train.Saver()
-    with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
-        sess.run(iterator.initializer)
+        with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
+            generated_images = generator(noise, training=True)
 
-        for epoch in range(total_epoch):
-            learning_rate = lrate * \
-                            math.pow(0.2, math.floor((epoch + 1) / epoch_drop))
-            for step in range(total_batch):
-                batch_x = sess.run(next_element)
-                batch_z = utils.get_noise(batch_size, n_noise)
+            real_output = discriminator(images, training=True)
+            fake_output = discriminator(generated_images, training=True)
 
-                _, loss_val_D = sess.run([d_opt, d_loss],
-                                        feed_dict={X: batch_x, Z: batch_z, Lr: learning_rate})
-                _, loss_val_G = sess.run([g_opt, g_loss],
-                                        feed_dict={Z: batch_z, Lr: learning_rate})
+            disc_loss, gen_loss = model.loss(real_output, fake_output)
 
-                if step % 300 == 0:
-                    #sample_size = 10
-                    #noise = get_noise(sample_size, n_noise)
-                    samples = sess.run(g_sample, feed_dict={Z: test_noise})
-                    title = 'samples/%05d_%05d.png'%(epoch, step)
-                    utils.save_samples(title, samples)
-                    
-                    print('Epoch:', '%04d' % epoch,
-                    '%05d/%05d' % (step, total_batch),
-                    'D loss: {:.4}'.format(loss_val_D),
-                    'G loss: {:.4}'.format(loss_val_G))
-            saver.save(sess, './models/dcgan', global_step=epoch)
+            gradients_of_generator = gen_tape.gradient(gen_loss, generator.trainable_variables)
+            gradients_of_discriminator = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
+
+            generator_optimizer.apply_gradients(zip(gradients_of_generator, generator.trainable_variables))
+            discriminator_optimizer.apply_gradients(zip(gradients_of_discriminator, discriminator.trainable_variables))
+    print ('Start Training!!!')
+
+    for epoch in range(total_epoch):
+        start = time.time()
+        learning_rate = lrate * \
+                math.pow(0.2, math.floor((epoch + 1) / epoch_drop))
+        discriminator_optimizer, generator_optimizer = model.optimizer(learning_rate)
+
+        #len(train_data_gen)
+        for i in range(len(train_data_gen)):
+            sample_training_images, _ = next(train_data_gen)
+            train_step(sample_training_images, discriminator_optimizer, generator_optimizer)
+            print('Training... {} / {} \r'.format(i + 1, len(train_data_gen)),end='')
+
+        # Produce images for the GIF as we go
+        utils.generate_and_save_images(generator,
+                                epoch + 1,
+                                seed)
+
+        # Save the model every 15 epochs
+        if (epoch + 1) % 15 == 0:
+            checkpoint.save(file_prefix = checkpoint_prefix)
+
+        print ('Time for epoch {} is {} sec'.format(epoch + 1, time.time()-start))
+
+    anim_file = 'dcgan.gif'
+    utils.generated_images(anim_file)
 
 
 
@@ -63,23 +102,18 @@ def train(data_root, model, total_epoch, batch_size, lrate):
 
 if __name__ == "__main__":
     #set hyper parameters
-    batch_size = 32
+    batch_size = 128
     n_noise = 100
-    image_size = 64
-    image_channels = 3
-    learning_rate = 0.0002
-    total_epochs = 20
+    learning_rate = 1e-5
+    total_epochs = 50
 
-    #model = SIMPLEGAN(batch_size, n_noise, image_size, image_channels)
-    model = DCGAN(batch_size, n_noise, image_size, image_channels)
-    #data_root = '../data/mnist/trainingSet' 
+    model = DCGAN()
     
     #download align_celeba dataset from https://www.kaggle.com/jessicali9530/celeba-dataset
     #extract and move to "./data/img_align_celeba"
-    data_root = './data/img_align_celeba'
+    train_dir = './data/img_align_celeba'
 
-    with tf.Graph().as_default():
-        train(data_root, model, total_epochs, batch_size, learning_rate)
+    train(train_dir, model, total_epochs, batch_size, learning_rate)
 
 
 

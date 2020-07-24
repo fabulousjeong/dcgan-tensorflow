@@ -18,7 +18,7 @@ def generate_and_save_images(model, epoch, test_input):
     plt.savefig(f'./images/image_at_epoch_{epoch:04d}.png')
     plt.close()
 
-def generate_gif():
+def generate_gif(anim_file):
     with imageio.get_writer(anim_file, mode='I') as writer:
         filenames = glob.glob('./images/image*.png')
         filenames = sorted(filenames)

@@ -1,6 +1,8 @@
 import tensorflow as tf
 tf.config.experimental_run_functions_eagerly(True)
 from dcgan import DCGAN
+import utils
+
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import os
 import numpy as np
@@ -10,6 +12,7 @@ import time
 import glob
 import imageio
 import math
+
 
 def train(train_dir, model, total_epoch, batch_size, lrate):
 

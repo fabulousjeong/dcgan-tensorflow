@@ -1,13 +1,11 @@
 import tensorflow as tf
 
 import os
-from simplegan import SIMPLEGAN
 from dcgan import DCGAN
 
 import math
 
 import utils
-from imageiteartor import ImageIterator
 import datetime
 import numpy as np
 
